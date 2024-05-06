@@ -1,0 +1,138 @@
+[
+    {
+        "id": 1,
+        "winCombination": [
+            {
+                "row": 0,
+                "col": 0
+            },
+            {
+                "row": 1,
+                "col": 0
+            },
+            {
+                "row": 2,
+                "col": 0
+            }
+        ]
+    },
+    {
+        "id": 2,
+        "winCombination": [
+            {
+                "row": 0,
+                "col": 0
+            },
+            {
+                "row": 1,
+                "col": 1
+            },
+            {
+                "row": 2,
+                "col": 2
+            }
+        ]
+    },
+    {
+        "id": 3,
+        "winCombination": [
+            {
+                "row": 0,
+                "col": 0
+            },
+            {
+                "row": 1,
+                "col": 1
+            },
+            {
+                "row": 2,
+                "col": 2
+            }
+        ]
+    },
+    {
+        "id": 4,
+        "winCombination": [
+            {
+                "row": 0,
+                "col": 0
+            },
+            {
+                "row": 1,
+                "col": 1
+            },
+            {
+                "row": 2,
+                "col": 2
+            }
+        ]
+    },
+    {
+        "id": 5,
+        "winCombination": [
+            {
+                "row": 1,
+                "col": 0
+            },
+            {
+                "row": 1,
+                "col": 1
+            },
+            {
+                "row": 1,
+                "col": 2
+            }
+        ]
+    },
+    {
+        "id": 6,
+        "winCombination": [
+            {
+                "row": 2,
+                "col": 0
+            },
+            {
+                "row": 2,
+                "col": 1
+            },
+            {
+                "row": 2,
+                "col": 2
+            }
+        ]
+    },
+    {
+        "id": 7,
+        "winCombination": [
+            {
+                "row": 0,
+                "col": 1
+            },
+            {
+                "row": 1,
+                "col": 1
+            },
+            {
+                "row": 2,
+                "col": 1
+            }
+        ]
+    },
+    {
+        "id": 8,
+        "winCombination": [
+            {
+                "row": 0,
+                "col": 2
+            },
+            {
+                "row": 1,
+                "col": 1
+            },
+            {
+                "row": 2,
+                "col": 0
+            }
+        ]
+    }
+]

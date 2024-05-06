@@ -2,18 +2,22 @@ import tkinter as tk
 from tkinter import messagebox, Menu, Toplevel, Label, simpledialog
 from PIL import ImageGrab
 import os
+import json
+from TicTacToeAI import TicTacToeAI
 
 class TicTacToe:
     def __init__(self, master):
         self.master = master
         self.master.title("Tic-Tac-Toe")
         self.players = {'X': 'Jugador 1', 'O': 'Computadora'}
-        self.current_player = "X"
+        self.current_player = "X"  # El jugador humano siempre inicia
         self.is_vs_computer = False
         self.board = [[None, None, None] for _ in range(3)]
         self.scores = {'X': 0, 'O': 0, 'Ties': 0}
         self.movements = []
         self.move_count = 0
+        self.json_file_path = "winning_combinations.json"
+        self.ai = TicTacToeAI(self.json_file_path)  # Inicializa la IA
         self.create_widgets()
         self.create_menu()
         self.history_folder = "history"
@@ -25,14 +29,14 @@ class TicTacToe:
         self.buttons = [[None for _ in range(3)] for _ in range(3)]
         for i in range(3):
             for j in range(3):
-                self.buttons[i][j] = tk.Button(self.master, text='', font=('Arial', 24), width=5, height=2,
+                self.buttons[i][j] = tk.Button(self.master, text=' ', font=('Arial', 24), width=5, height=2,
                                                command=lambda row=i, col=j: self.on_button_press(row, col))
                 self.buttons[i][j].grid(row=i, column=j)
 
         self.score_label = tk.Label(self.master, text=self.get_score_text(), font=('Arial', 14))
         self.score_label.grid(row=0, column=3, rowspan=3, sticky='n')
 
-        self.game_mode_label = tk.Label(self.master, text='', font=('Arial', 16), fg='blue')
+        self.game_mode_label = tk.Label(self.master, text=' ', font=('Arial', 16), fg='blue')
         self.game_mode_label.grid(row=3, column=0, columnspan=3, sticky='n')
 
         self.reset_button = tk.Button(self.master, text="Reiniciar", command=self.reset_game)
@@ -45,15 +49,24 @@ class TicTacToe:
         game_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="Juego", menu=game_menu)
         game_menu.add_command(label="Jugar", command=self.reset_game)
-        game_menu.add_command(label="Jugar contra Computadora", command=self.play_vs_computer)
+        game_menu.add_command(label="Jugar contra Computadora", command=self.player_vs_computer)
         game_menu.add_command(label="Ver Historia", command=self.show_history)
         game_menu.add_command(label="Configurar Jugadores", command=self.configure_players)
 
-    def play_vs_computer(self):
+    def player_vs_computer(self):
         self.is_vs_computer = True
         self.players['O'] = "Computadora"
-        self.reset_game()
+        self.reset_game()  # Reinicia el juego con el jugador humano comenzando
         self.update_game_mode_label()
+
+    def computer_move(self):
+        # Asegurarse que el tablero no está lleno y que es el turno de la computadora
+        if not self.is_board_full() and self.current_player == 'O':
+            state = [[self.buttons[i][j]['text'] for j in range(3)] for i in range(3)]
+            move = self.ai.select_move(state)
+            if move:
+                self.on_button_press(move[0], move[1], is_ai=True)
+
 
     def set_player_names(self):
         self.players['X'] = simpledialog.askstring("Nombre del Jugador", "Ingresa tu nombre (Jugador X):", parent=self.master) or "Jugador 1"
@@ -78,25 +91,35 @@ class TicTacToe:
     def get_score_text(self):
         return f"{self.players['X']}: {self.scores['X']}\n{self.players['O']}: {self.scores['O']}\nEmpates: {self.scores['Ties']}"
 
-    def on_button_press(self, row, col):
-        if self.buttons[row][col]['text'] == '' and self.current_player:
+    def on_button_press(self, row, col, is_ai=False):
+        # Solo permitir movimientos si el espacio está vacío y es el turno correcto
+        if self.buttons[row][col]['text'] == ' ' and (is_ai or self.current_player == 'X'):
             self.buttons[row][col]['text'] = self.current_player
-            self.record_move(row, col)  # Record the move
-            if self.check_winner(self.current_player):
-                messagebox.showinfo("Fin del Juego", f"{self.players[self.current_player]} ha ganado!")
-                self.capture_screen()
-                self.scores[self.current_player] += 1
-                self.print_movements()  # Print all movements
-                self.reset_board()
+            winner, winning_coords = self.check_winner(self.current_player)
+            if winner:
+                self.handle_game_end(winning_coords)
             elif self.is_board_full():
                 messagebox.showinfo("Fin del Juego", "Es un empate!")
-                self.capture_screen()
-                self.scores['Ties'] += 1
-                self.print_movements()  # Print all movements
                 self.reset_board()
             else:
-                self.current_player = "O" if self.current_player == "X" else "X"
+                self.toggle_player()  # Cambiar de jugador
+                # Si es el turno de la computadora, invocar su movimiento después de un pequeño delay
+                if self.is_vs_computer and self.current_player == 'O':
+                    self.master.after(500, self.computer_move())
             self.score_label.config(text=self.get_score_text())
+
+    def toggle_player(self):
+        self.current_player = 'O' if self.current_player == 'X' else 'X'
+        
+
+
+    def handle_game_end(self, winning_coords):
+        messagebox.showinfo("Fin del Juego", f"{self.players[self.current_player]} ha ganado!")
+        self.capture_screen()
+        self.scores[self.current_player] += 1
+        if winning_coords:
+            self.save_winning_combination(winning_coords)
+        self.reset_board()
 
     def record_move(self, row, col):
         self.move_count += 1
@@ -110,22 +133,23 @@ class TicTacToe:
         self.move_count = 0  # Reset move count
 
     def check_winner(self, player):
-        for i in range(3):
-            if all(self.buttons[i][j]['text'] == player for j in range(3)) or \
-               all(self.buttons[j][i]['text'] == player for j in range(3)):
-                return True
-        if self.buttons[0][0]['text'] == self.buttons[1][1]['text'] == self.buttons[2][2]['text'] == player or \
-           self.buttons[0][2]['text'] == self.buttons[1][1]['text'] == self.buttons[2][0]['text'] == player:
-            return True
-        return False
+        winning_positions = [
+            [(0, 0), (0, 1), (0, 2)], [(1, 0), (1, 1), (1, 2)], [(2, 0), (2, 1), (2, 2)],
+            [(0, 0), (1, 0), (2, 0)], [(0, 1), (1, 1), (2, 1)], [(0, 2), (1, 2), (2, 2)],
+            [(0, 0), (1, 1), (2, 2)], [(0, 2), (1, 1), (2, 0)]
+        ]
+        for positions in winning_positions:
+            if all(self.buttons[row][col]['text'] == player for row, col in positions):
+                return True, positions
+        return False, None
 
     def is_board_full(self):
-        return all(self.buttons[i][j]['text'] != '' for i in range(3) for j in range(3))
+        return all(self.buttons[i][j]['text'] != ' ' for i in range(3) for j in range(3))
 
     def reset_board(self):
         for i in range(3):
             for j in range(3):
-                self.buttons[i][j].config(text='')
+                self.buttons[i][j].config(text=' ')
         self.current_player = "X"
 
     def reset_game(self):
@@ -161,6 +185,25 @@ class TicTacToe:
 
         frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
+
+
+    def save_winning_combination(self, winning_coords):
+        try:
+            data = []
+            if os.path.exists(self.json_file_path):
+                with open(self.json_file_path, 'r') as file:
+                    data = json.load(file)
+
+            new_id = len(data) + 1
+            win_combination = [{"row": row, "col": col} for row, col in winning_coords]
+
+            data.append({"id": new_id, "winCombination": win_combination})
+
+            with open(self.json_file_path, 'w') as file:
+                json.dump(data, file, indent=4)
+
+        except Exception as e:
+            print(f"Error saving to JSON: {e}")
 
 if __name__ == "__main__":
     root = tk.Tk()
