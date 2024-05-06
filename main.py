@@ -7,11 +7,13 @@ class TicTacToe:
     def __init__(self, master):
         self.master = master
         self.master.title("Tic-Tac-Toe")
-        self.players = {'X': 'Jugador 1', 'O': 'Jugador 2'}
+        self.players = {'X': 'Jugador 1', 'O': 'Computadora'}
         self.current_player = "X"
         self.is_vs_computer = False
         self.board = [[None, None, None] for _ in range(3)]
         self.scores = {'X': 0, 'O': 0, 'Ties': 0}
+        self.movements = []
+        self.move_count = 0
         self.create_widgets()
         self.create_menu()
         self.history_folder = "history"
@@ -42,7 +44,7 @@ class TicTacToe:
 
         game_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="Juego", menu=game_menu)
-        game_menu.add_command(label="Jugador vs Jugador", command=self.set_player_names)
+        game_menu.add_command(label="Jugar", command=self.reset_game)
         game_menu.add_command(label="Jugar contra Computadora", command=self.play_vs_computer)
         game_menu.add_command(label="Ver Historia", command=self.show_history)
         game_menu.add_command(label="Configurar Jugadores", command=self.configure_players)
@@ -79,19 +81,33 @@ class TicTacToe:
     def on_button_press(self, row, col):
         if self.buttons[row][col]['text'] == '' and self.current_player:
             self.buttons[row][col]['text'] = self.current_player
+            self.record_move(row, col)  # Record the move
             if self.check_winner(self.current_player):
                 messagebox.showinfo("Fin del Juego", f"{self.players[self.current_player]} ha ganado!")
                 self.capture_screen()
                 self.scores[self.current_player] += 1
+                self.print_movements()  # Print all movements
                 self.reset_board()
             elif self.is_board_full():
                 messagebox.showinfo("Fin del Juego", "Es un empate!")
                 self.capture_screen()
                 self.scores['Ties'] += 1
+                self.print_movements()  # Print all movements
                 self.reset_board()
             else:
                 self.current_player = "O" if self.current_player == "X" else "X"
             self.score_label.config(text=self.get_score_text())
+
+    def record_move(self, row, col):
+        self.move_count += 1
+        move_description = f"Movimiento {self.move_count} - Jugador {self.current_player}: [{row}][{col}]"
+        self.movements.append(move_description)
+
+    def print_movements(self):
+        for move in self.movements:
+            print(move)
+        self.movements = []  # Clear movements after printing
+        self.move_count = 0  # Reset move count
 
     def check_winner(self, player):
         for i in range(3):
@@ -120,7 +136,7 @@ class TicTacToe:
 
     def capture_screen(self):
         x = self.master.winfo_rootx() + self.buttons[0][0].winfo_x()
-        y = self.master.winfo_rooty() + the.buttons[0][0].winfo_y()
+        y = self.master.winfo_rooty() + self.buttons[0][0].winfo_y()
         x1 = x + 3*self.buttons[0][0].winfo_width()
         y1 = y + 3*self.buttons[0][0].winfo_height()
         ImageGrab.grab().crop((x, y, x1, y1)).save(os.path.join(self.history_folder, f'history_{len(os.listdir(self.history_folder))+1}.png'))
