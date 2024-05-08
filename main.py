@@ -52,6 +52,7 @@ class TicTacToe:
         game_menu.add_command(label="Jugar contra Computadora", command=self.player_vs_computer)
         game_menu.add_command(label="Ver Historia", command=self.show_history)
         game_menu.add_command(label="Configurar Jugadores", command=self.configure_players)
+        game_menu.add_command(label="Entrenar modelo", command=self.ask_training_games)
 
     def player_vs_computer(self):
         self.is_vs_computer = True
@@ -189,21 +190,43 @@ class TicTacToe:
 
     def save_winning_combination(self, winning_coords):
         try:
-            data = []
+            # Verifica si el archivo existe y carga los datos, de lo contrario inicializa un arreglo vacío
             if os.path.exists(self.json_file_path):
                 with open(self.json_file_path, 'r') as file:
                     data = json.load(file)
+            else:
+                data = []  # Inicializa un nuevo arreglo si el archivo no existe
 
+            # Calcula el nuevo ID como el siguiente en la secuencia
             new_id = len(data) + 1
+            # Crea una lista de diccionarios para cada coordenada ganadora
             win_combination = [{"row": row, "col": col} for row, col in winning_coords]
 
+            # Agrega la nueva combinación ganadora al arreglo de datos
             data.append({"id": new_id, "winCombination": win_combination})
 
+            # Escribe los datos actualizados de vuelta al archivo JSON
             with open(self.json_file_path, 'w') as file:
                 json.dump(data, file, indent=4)
 
         except Exception as e:
             print(f"Error saving to JSON: {e}")
+
+
+    def ask_training_games(self):
+        """Solicita al usuario el número de juegos para entrenar la IA."""
+        num_games = simpledialog.askinteger("Entrenar IA", "¿Cuántos juegos debería jugar la IA para entrenarse?",
+                                            parent=self.master, minvalue=1, maxvalue=10000)
+        if num_games is not None:  # Asegúrate de que el usuario no cancele la solicitud
+            self.train_ai(num_games)
+
+    def train_ai(self, num_games):
+        """Función para iniciar el entrenamiento de la IA."""
+        self.ai.train(num_games)
+        messagebox.showinfo("Entrenamiento completo", f"La IA ha completado {num_games} juegos de entrenamiento.")
+        # Opcional: guardar el historial de la Q-table o crear un gráfico aquí
+        self.ai.save_q_table_history()
+        self.ai.create_q_table_graph(self.ai.q_table_history, folder_name='graphvizTrainingModel', filename='q_table_history')
 
 if __name__ == "__main__":
     root = tk.Tk()
