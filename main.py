@@ -1,8 +1,11 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, Toplevel, Menu, Label, PhotoImage
+from PIL import Image, ImageTk, ImageGrab
 from avlNode import AVLNode, AVLTree
 import numpy as np
 import random
+import os
+import datetime
 
 
 class TicTacToeApp:
@@ -12,6 +15,7 @@ class TicTacToeApp:
         self.root.title("Juego de Totito")
         self.reset_game()
         self.create_widgets()
+        self.create_menu()
 
     def create_widgets(self):
         self.buttons = []
@@ -23,6 +27,11 @@ class TicTacToeApp:
         
         self.reset_button = tk.Button(self.root, text='Reiniciar Juego', command=self.reset_game)
         self.reset_button.grid(row=3, column=0, columnspan=3)
+
+        # Botón para guardar la captura de pantalla del tablero
+        self.save_history_button = tk.Button(self.root, text='Guardar Historial', command=self.save_screenshot)
+        self.save_history_button.grid(row=3, column=1, columnspan=3)
+        
         self.update_scores()
 
     def update_scores(self):
@@ -103,10 +112,12 @@ class TicTacToeApp:
             if winner:
                 self.update_score(winner)
                 messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!")
+                self.save_screenshot() 
                 self.reset_game()
             elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
                 self.draws += 1
                 messagebox.showinfo("Juego Terminado", "¡Es un empate!")
+                self.save_screenshot() 
                 self.reset_game()
             else:
                 # Cambiar el turno
@@ -261,16 +272,79 @@ class TicTacToeApp:
             if winner:
                 self.update_score(winner)
                 messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!")
+                self.save_screenshot() 
                 self.reset_game()
             elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
                 self.draws += 1
                 messagebox.showinfo("Juego Terminado", "¡Es un empate!")
+                self.save_screenshot() 
                 self.reset_game()
             else:
                 # Cambia el turno al jugador humano
                 self.turn = 'X'
                 self.update_scores()
                 # self.x
+
+    def create_menu(self):
+        menu_bar = Menu(self.root)
+        self.root.config(menu=menu_bar)
+
+        # Adding a 'File' menu
+        file_menu = Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Archivo", menu=file_menu)
+        file_menu.add_command(label="Historial", command=self.show_history)
+
+    def save_screenshot(self):
+        # Ensure the 'history' directory exists
+        os.makedirs('history', exist_ok=True)
+
+        # Get the bounding box of the game board
+        x0 = self.root.winfo_rootx() + self.buttons[0].winfo_x()
+        y0 = self.root.winfo_rooty() + self.buttons[0].winfo_y()
+        x1 = x0 + 3 * self.buttons[0].winfo_width()
+        y1 = y0 + 3 * self.buttons[0].winfo_height()
+
+        # Capture and save the screenshot
+        img = ImageGrab.grab(bbox=(x0, y0, x1, y1))
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        img.save(f'history/game_{timestamp}.png')
+        print(f"Saved screenshot as 'history/game_{timestamp}.png'")
+
+    def show_history(self):
+        # Open a new window to show the history of games
+        history_window = Toplevel()
+        history_window.title("Historial de Partidas")
+
+        # Use a scrollbar on the canvas
+        canvas = tk.Canvas(history_window)
+        scrollbar = tk.Scrollbar(history_window, command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas)
+
+        # Configure canvas and scrollbar
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+        game_files = sorted([f for f in os.listdir('history') if f.endswith('.png')], reverse=True)
+        for i, filename in enumerate(game_files, start=1):
+            image_path = os.path.join('history', filename)
+            img = Image.open(image_path)
+            img.thumbnail((150, 150), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+
+            label_image = Label(scrollable_frame, image=photo)
+            label_image.image = photo  # Keep a reference!
+            label_image.grid(row=i, column=0, padx=10, pady=10)
+
+            # Display dummy Q-values or load real Q-values if you have them
+            # Example with dummy values:
+            q_values_text = "Q-values: " + ", ".join(f"{k}: {v:.2f}" for k, v in enumerate(np.random.rand(9)))
+            label_q_values = Label(scrollable_frame, text=f"Partida {i}: {q_values_text}", font=("Arial", 10))
+            label_q_values.grid(row=i, column=1, sticky="w", padx=10)
+
+        # Pack and place the canvas and scrollbar in the window
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
 
 if __name__ == "__main__":
