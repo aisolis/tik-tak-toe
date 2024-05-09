@@ -1,234 +1,280 @@
 import tkinter as tk
-from tkinter import messagebox, Menu, Toplevel, Label, simpledialog
-from PIL import ImageGrab
-import os
-import json
-from TicTacToeAI import TicTacToeAI
+from tkinter import messagebox
+from avlNode import AVLNode, AVLTree
+import numpy as np
+import random
 
-class TicTacToe:
-    def __init__(self, master):
-        self.master = master
-        self.master.title("Tic-Tac-Toe")
-        self.players = {'X': 'Jugador 1', 'O': 'Computadora'}
-        self.current_player = "X"  # El jugador humano siempre inicia
-        self.is_vs_computer = False
-        self.board = [[None, None, None] for _ in range(3)]
-        self.scores = {'X': 0, 'O': 0, 'Ties': 0}
-        self.movements = []
-        self.move_count = 0
-        self.json_file_path = "winning_combinations.json"
-        self.ai = TicTacToeAI(self.json_file_path)  # Inicializa la IA
+
+class TicTacToeApp:
+    def __init__(self, root, avl_tree):
+        self.root = root
+        self.avl_tree = avl_tree  # Instancia del árbol AVL
+        self.root.title("Juego de Totito")
+        self.reset_game()
         self.create_widgets()
-        self.create_menu()
-        self.history_folder = "history"
-        if not os.path.exists(self.history_folder):
-            os.makedirs(self.history_folder)
-        self.set_player_names()
 
     def create_widgets(self):
-        self.buttons = [[None for _ in range(3)] for _ in range(3)]
-        for i in range(3):
-            for j in range(3):
-                self.buttons[i][j] = tk.Button(self.master, text=' ', font=('Arial', 24), width=5, height=2,
-                                               command=lambda row=i, col=j: self.on_button_press(row, col))
-                self.buttons[i][j].grid(row=i, column=j)
-
-        self.score_label = tk.Label(self.master, text=self.get_score_text(), font=('Arial', 14))
-        self.score_label.grid(row=0, column=3, rowspan=3, sticky='n')
-
-        self.game_mode_label = tk.Label(self.master, text=' ', font=('Arial', 16), fg='blue')
-        self.game_mode_label.grid(row=3, column=0, columnspan=3, sticky='n')
-
-        self.reset_button = tk.Button(self.master, text="Reiniciar", command=self.reset_game)
-        self.reset_button.grid(row=4, column=0, columnspan=4, sticky='we')
-
-    def create_menu(self):
-        menu = Menu(self.master)
-        self.master.config(menu=menu)
-
-        game_menu = Menu(menu, tearoff=0)
-        menu.add_cascade(label="Juego", menu=game_menu)
-        game_menu.add_command(label="Jugar", command=self.reset_game)
-        game_menu.add_command(label="Jugar contra Computadora", command=self.player_vs_computer)
-        game_menu.add_command(label="Ver Historia", command=self.show_history)
-        game_menu.add_command(label="Configurar Jugadores", command=self.configure_players)
-        game_menu.add_command(label="Entrenar modelo", command=self.ask_training_games)
-
-    def player_vs_computer(self):
-        self.is_vs_computer = True
-        self.players['O'] = "Computadora"
-        self.reset_game()  # Reinicia el juego con el jugador humano comenzando
-        self.update_game_mode_label()
-
-    def computer_move(self):
-        # Asegurarse que el tablero no está lleno y que es el turno de la computadora
-        if not self.is_board_full() and self.current_player == 'O':
-            state = [[self.buttons[i][j]['text'] for j in range(3)] for i in range(3)]
-            move = self.ai.select_move(state)
-            if move:
-                self.on_button_press(move[0], move[1], is_ai=True)
-
-
-    def set_player_names(self):
-        self.players['X'] = simpledialog.askstring("Nombre del Jugador", "Ingresa tu nombre (Jugador X):", parent=self.master) or "Jugador 1"
-        self.players['O'] = simpledialog.askstring("Nombre del Jugador", "Ingresa tu nombre (Jugador O):", parent=self.master) or "Jugador 2"
-        self.score_label.config(text=self.get_score_text())
-        self.is_vs_computer = False
-        self.update_game_mode_label()
-
-    def configure_players(self):
-        if not self.is_vs_computer:
-            for key in self.players:
-                self.players[key] = simpledialog.askstring("Nombre del Jugador", f"Nombre para {key}:", parent=self.master)
-        else:
-            self.players['X'] = simpledialog.askstring("Nombre del Jugador", "Nombre para Jugador 1:", parent=self.master)
-        self.score_label.config(text=self.get_score_text())  # Update score label
-        self.update_game_mode_label()
-
-    def update_game_mode_label(self):
-        mode_text = "Modo: Jugador vs. Computadora" if self.is_vs_computer else "Modo: Jugador vs. Jugador"
-        self.game_mode_label.config(text=mode_text)
-
-    def get_score_text(self):
-        return f"{self.players['X']}: {self.scores['X']}\n{self.players['O']}: {self.scores['O']}\nEmpates: {self.scores['Ties']}"
-
-    def on_button_press(self, row, col, is_ai=False):
-        # Solo permitir movimientos si el espacio está vacío y es el turno correcto
-        if self.buttons[row][col]['text'] == ' ' and (is_ai or self.current_player == 'X'):
-            self.buttons[row][col]['text'] = self.current_player
-            winner, winning_coords = self.check_winner(self.current_player)
-            if winner:
-                self.handle_game_end(winning_coords)
-            elif self.is_board_full():
-                messagebox.showinfo("Fin del Juego", "Es un empate!")
-                self.reset_board()
-            else:
-                self.toggle_player()  # Cambiar de jugador
-                # Si es el turno de la computadora, invocar su movimiento después de un pequeño delay
-                if self.is_vs_computer and self.current_player == 'O':
-                    self.master.after(500, self.computer_move())
-            self.score_label.config(text=self.get_score_text())
-
-    def toggle_player(self):
-        self.current_player = 'O' if self.current_player == 'X' else 'X'
+        self.buttons = []
+        for i in range(9):
+            btn = tk.Button(self.root, text='', font=('Arial', 24), height=3, width=6,
+                            command=lambda i=i: self.on_button_press(i))
+            btn.grid(row=i//3, column=i%3)
+            self.buttons.append(btn)
         
+        self.reset_button = tk.Button(self.root, text='Reiniciar Juego', command=self.reset_game)
+        self.reset_button.grid(row=3, column=0, columnspan=3)
+        self.update_scores()
 
+    def update_scores(self):
+        score_text = f"Victorias (X): {self.score_x}  Victorias (O): {self.score_o}  Empates: {self.draws}"
+        if hasattr(self, 'score_label'):
+            self.score_label.config(text=score_text)
+        else:
+            self.score_label = tk.Label(self.root, text=score_text)
+            self.score_label.grid(row=4, column=0, columnspan=3)
 
-    def handle_game_end(self, winning_coords):
-        messagebox.showinfo("Fin del Juego", f"{self.players[self.current_player]} ha ganado!")
-        self.capture_screen()
-        self.scores[self.current_player] += 1
-        if winning_coords:
-            self.save_winning_combination(winning_coords)
-        self.reset_board()
-
-    def record_move(self, row, col):
-        self.move_count += 1
-        move_description = f"Movimiento {self.move_count} - Jugador {self.current_player}: [{row}][{col}]"
-        self.movements.append(move_description)
-
-    def print_movements(self):
-        for move in self.movements:
-            print(move)
-        self.movements = []  # Clear movements after printing
-        self.move_count = 0  # Reset move count
-
-    def check_winner(self, player):
-        winning_positions = [
-            [(0, 0), (0, 1), (0, 2)], [(1, 0), (1, 1), (1, 2)], [(2, 0), (2, 1), (2, 2)],
-            [(0, 0), (1, 0), (2, 0)], [(0, 1), (1, 1), (2, 1)], [(0, 2), (1, 2), (2, 2)],
-            [(0, 0), (1, 1), (2, 2)], [(0, 2), (1, 1), (2, 0)]
+    def winner(self):
+        # Definir todas las combinaciones posibles para ganar en un tablero 3x3
+        lines = [
+            (0, 1, 2), (3, 4, 5), (6, 7, 8),  # líneas horizontales
+            (0, 3, 6), (1, 4, 7), (2, 5, 8),  # líneas verticales
+            (0, 4, 8), (2, 4, 6)             # diagonales
         ]
-        for positions in winning_positions:
-            if all(self.buttons[row][col]['text'] == player for row, col in positions):
-                return True, positions
-        return False, None
+        # Revisar cada combinación para ver si hay una línea ganadora
+        for a, b, c in lines:
+            if self.buttons[a]['text'] == self.buttons[b]['text'] == self.buttons[c]['text'] != '':
+                return self.buttons[a]['text']
+        # Si no hay ganador, devuelve None
+        return None
 
-    def is_board_full(self):
-        return all(self.buttons[i][j]['text'] != ' ' for i in range(3) for j in range(3))
 
-    def reset_board(self):
-        for i in range(3):
-            for j in range(3):
-                self.buttons[i][j].config(text=' ')
-        self.current_player = "X"
+    def update_score(self, winner):
+        if winner == 'X':
+            self.score_x += 1
+        elif winner == 'O':
+            self.score_o += 1
 
     def reset_game(self):
-        self.reset_board()
-        self.scores = {'X': 0, 'O': 0, 'Ties': 0}
-        self.score_label.config(text=self.get_score_text())
-        self.update_game_mode_label()
+        self.turn = 'X'
+        if hasattr(self, 'buttons'):
+            for btn in self.buttons:
+                btn.config(text='')
+        self.score_x = getattr(self, 'score_x', 0)
+        self.score_o = getattr(self, 'score_o', 0)
+        self.draws = getattr(self, 'draws', 0)
+        self.update_scores()
 
-    def capture_screen(self):
-        x = self.master.winfo_rootx() + self.buttons[0][0].winfo_x()
-        y = self.master.winfo_rooty() + self.buttons[0][0].winfo_y()
-        x1 = x + 3*self.buttons[0][0].winfo_width()
-        y1 = y + 3*self.buttons[0][0].winfo_height()
-        ImageGrab.grab().crop((x, y, x1, y1)).save(os.path.join(self.history_folder, f'history_{len(os.listdir(self.history_folder))+1}.png'))
+    def create_widgets(self):
+        self.buttons = []
+        for i in range(9):
+            btn = tk.Button(self.root, text='', font=('Arial', 24), height=3, width=6,
+                            command=lambda i=i: self.on_button_press(i))
+            btn.grid(row=i//3, column=i%3)
+            self.buttons.append(btn)
+        
+        self.reset_button = tk.Button(self.root, text='Reiniciar Juego', command=self.reset_game)
+        self.reset_button.grid(row=3, column=0, columnspan=3)
+        self.update_scores()
 
-    def show_history(self):
-        top = Toplevel(self.master)
-        top.title("Historia de Partidas")
-        scroll = tk.Scrollbar(top)
-        scroll.pack(side="right", fill="y")
-        canvas = tk.Canvas(top, yscrollcommand=scroll.set)
-        scroll.config(command=canvas.yview)
-        frame = tk.Frame(canvas)
-        canvas.pack(side="left", fill="both", expand=True)
-        canvas.create_window((0,0), window=frame, anchor='nw')
+    def reset_game(self):
+        self.turn = 'X'  # Iniciar siempre con el jugador humano
+        self.avl_tree.root = None  # Reiniciar el árbol AVL
+        if hasattr(self, 'buttons'):
+            for btn in self.buttons:
+                btn.config(text='')
+        self.score_x = getattr(self, 'score_x', 0)
+        self.score_o = getattr(self, 'score_o', 0)
+        self.draws = getattr(self, 'draws', 0)
+        self.update_scores()
 
-        for file_name in os.listdir(self.history_folder):
-            path = os.path.join(self.history_folder, file_name)
-            img = tk.PhotoImage(file=path)
-            label = Label(frame, image=img)
-            label.image = img  # keep a reference!
-            label.pack()
+    def on_button_press(self, index):
+        if self.buttons[index]['text'] == '' and self.winner() is None:
+            self.buttons[index]['text'] = self.turn
+            current_state = self.get_board_state()
 
-        frame.update_idletasks()
-        canvas.config(scrollregion=canvas.bbox("all"))
+            # Actualizar el árbol AVL con el nuevo estado del juego
+            # Nota: Deberías definir cómo calcular el valor Q para el nuevo estado aquí
+            # Por simplicidad, se usa un valor Q dummy
+            dummy_value_q = {i: 0 for i in range(9) if self.buttons[i]['text'] == ''}
+            self.avl_tree.root = self.avl_tree.insert(self.avl_tree.root, current_state, dummy_value_q)
 
-
-    def save_winning_combination(self, winning_coords):
-        try:
-            # Verifica si el archivo existe y carga los datos, de lo contrario inicializa un arreglo vacío
-            if os.path.exists(self.json_file_path):
-                with open(self.json_file_path, 'r') as file:
-                    data = json.load(file)
+            # Verificar si hay un ganador
+            winner = self.winner()
+            if winner:
+                self.update_score(winner)
+                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!")
+                self.reset_game()
+            elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
+                self.draws += 1
+                messagebox.showinfo("Juego Terminado", "¡Es un empate!")
+                self.reset_game()
             else:
-                data = []  # Inicializa un nuevo arreglo si el archivo no existe
+                # Cambiar el turno
+                self.turn = 'O' if self.turn == 'X' else 'X'
+                self.update_scores()
+                # Si es el turno de la máquina, realizar el movimiento
+                if self.turn == 'O':
+                    self.root.after(500, self.machine_move)
 
-            # Calcula el nuevo ID como el siguiente en la secuencia
-            new_id = len(data) + 1
-            # Crea una lista de diccionarios para cada coordenada ganadora
-            win_combination = [{"row": row, "col": col} for row, col in winning_coords]
+    def get_board_state(self):
+        # Convertir el estado del tablero a una tupla para ser hashable
+        return tuple(btn['text'] for btn in self.buttons)
 
-            # Agrega la nueva combinación ganadora al arreglo de datos
-            data.append({"id": new_id, "winCombination": win_combination})
+    def update_q_values(self, state, action_index, reward, is_diagonal_move=False, blocked_opponent=False, gamma=0.9):
+        # Search for the node with the current state in the AVL tree
+        node = self.avl_tree.search(self.avl_tree.root, state)
+        
+        # If the node doesn't exist, create a new node with initial Q values
+        if not node:
+            new_q_values = {i: 0 for i in range(9) if self.buttons[i]['text'] == ''}
+            node = AVLNode(state, new_q_values)
+            self.avl_tree.root = self.avl_tree.insert(self.avl_tree.root, state, new_q_values)
+            node.value_q[action_index] = reward  # Initialize with given reward
+            
+        # Calculate the reward adjusted for special moves
+        adjusted_reward = reward
+        if is_diagonal_move:
+            adjusted_reward += 0.5
+        if blocked_opponent:
+            adjusted_reward += 0.3
+        
+        # Calculate the best future Q value from this state
+        if node.value_q:
+            future_q = max(node.value_q.values())
+        else:
+            future_q = 0
+        
+        # Update the Q value using the Q-learning formula
+        updated_q = adjusted_reward + gamma * future_q
+        
+        # Update the Q value for the given action
+        node.value_q[action_index] = updated_q
 
-            # Escribe los datos actualizados de vuelta al archivo JSON
-            with open(self.json_file_path, 'w') as file:
-                json.dump(data, file, indent=4)
 
-        except Exception as e:
-            print(f"Error saving to JSON: {e}")
+    def machine_move(self):
+        current_state = self.get_board_state()
+        empty_indices = [i for i, btn in enumerate(self.buttons) if btn['text'] == '']
+        print("machine turn")
+        if empty_indices:
+            # Decidir entre explorar o explotar
+            epsilon = 0.1  # Probabilidad de exploración
+            if np.random.random() < epsilon:
+                chosen_index = random.choice(empty_indices)  # Exploración: movimiento aleatorio
+                print("machine exploration")
+            else:
+                # Verifica si necesita bloquear una jugada ganadora del humano
+                chosen_index = self.block_opponent_win(current_state, empty_indices)
+                if chosen_index is None:
+                    # Si no hay jugada de bloqueo necesaria, explotar basado en Q-values
+                    print("machine explore")
+                    chosen_index = self.choose_best_move(current_state, empty_indices)
+
+            # Ejecuta el movimiento seleccionado para la máquina
+            self.execute_move(chosen_index, 'O')
+
+            # Evaluar el resultado del movimiento después de que se ha ejecutado
+            reward, is_diagonal, blocked_opponent = self.evaluate_move_result(chosen_index)
+
+            # Actualizar los valores Q con la nueva información
+            self.update_q_values(current_state, chosen_index, reward, is_diagonal, blocked_opponent)
+            print("imprimiendo q values")
+            # Verificar el estado del juego y cambiar el turno si es necesario
+            if not self.winner() and '' in [btn['text'] for btn in self.buttons]:
+                self.turn = 'X'  # Devolver el turno al jugador humano
+                self.update_scores()
+                print("devolviendo turno")
+            print("fin")
+
+    def block_opponent_win(self, state, empty_indices):
+        opponent = 'X' if self.turn == 'O' else 'O'
+        for index in empty_indices:
+            self.buttons[index]['text'] = opponent  # Simula el movimiento del oponente
+            if self.winner() == opponent:
+                print("machine detect a losse probably")
+                self.buttons[index]['text'] = ''  # Limpia la simulación
+                return index  # Devuelve este índice para bloquear la jugada ganadora
+            self.buttons[index]['text'] = ''  # Limpia la simulación
+        return None
 
 
-    def ask_training_games(self):
-        """Solicita al usuario el número de juegos para entrenar la IA."""
-        num_games = simpledialog.askinteger("Entrenar IA", "¿Cuántos juegos debería jugar la IA para entrenarse?",
-                                            parent=self.master, minvalue=1, maxvalue=10000)
-        if num_games is not None:  # Asegúrate de que el usuario no cancele la solicitud
-            self.train_ai(num_games)
+    def evaluate_diagonal(self, state, index):
+        # Esta función debería evaluar si el movimiento es diagonal y si bloquea al oponente
+        # Implementación específica dependiendo de cómo defines un movimiento diagonal y bloqueo
+        is_diagonal = index in [0, 2, 4, 6, 8]  # Índices de las posiciones diagonales en un tablero 3x3
+        blocked_opponent = False  # Evaluar si este movimiento bloquea al oponente
+        return is_diagonal, blocked_opponent
 
-    def train_ai(self, num_games):
-        """Función para iniciar el entrenamiento de la IA."""
-        self.ai.train(num_games)
-        messagebox.showinfo("Entrenamiento completo", f"La IA ha completado {num_games} juegos de entrenamiento.")
-        # Opcional: guardar el historial de la Q-table o crear un gráfico aquí
-        self.ai.save_q_table_history()
-        self.ai.create_q_table_graph(self.ai.q_table_history, folder_name='graphvizTrainingModel', filename='q_table_history')
+    def choose_best_move(self, state, possible_moves):
+        node = self.avl_tree.search(self.avl_tree.root, state)
+        if node and node.value_q:
+            # Incorporar una pequeña probabilidad de elegir un movimiento aleatorio incluso durante la explotación
+            if np.random.random() < 0.05:  # 5% de probabilidad de movimiento aleatorio
+                return random.choice(possible_moves)
+
+            # Elegir el índice con el máximo valor Q entre los posibles movimientos
+            max_q_value = max(node.value_q.get(index, 0) for index in possible_moves)
+            best_moves = [index for index in possible_moves if node.value_q.get(index, 0) == max_q_value]
+            print("machine choose a best movement")
+            return random.choice(best_moves)  # Para evitar sesgos si hay múltiples mejores movimientos
+        return random.choice(possible_moves)
+
+
+    def evaluate_move_result(self, index):
+        # Establece recompensas base
+        reward = 0
+        is_diagonal = False
+        blocked_opponent = False
+
+        # Verifica si el movimiento es diagonal
+        is_diagonal = index in [0, 2, 4, 6, 8]
+
+        # Guarda el estado original del botón para restaurarlo después de la evaluación
+        original_text = self.buttons[index]['text']
+
+        # Actualiza el tablero temporalmente para la evaluación
+        self.buttons[index]['text'] = self.turn
+        winner = self.winner()
+
+        if winner:
+            # Si el jugador actual gana con este movimiento
+            reward = 1 if winner == self.turn else -1
+        else:
+            # Evaluar si el movimiento bloquea al oponente
+            opponent = 'X' if self.turn == 'O' else 'O'
+            for a, b, c in [(0, 1, 2), (3, 4, 5), (6, 7, 8),
+                            (0, 3, 6), (1, 4, 7), (2, 5, 8),
+                            (0, 4, 8), (2, 4, 6)]:
+                if {self.buttons[a]['text'], self.buttons[b]['text'], self.buttons[c]['text']} == {opponent, self.turn, ''}:
+                    blocked_opponent = True
+                    reward += 0.3  # Agrega una recompensa pequeña por bloquear una jugada ganadora
+
+        # Restaura el estado original del tablero
+        self.buttons[index]['text'] = original_text
+
+        return reward, is_diagonal, blocked_opponent
+
+    def execute_move(self, index, player):
+        if self.buttons[index]['text'] == '' and self.winner() is None:
+            self.buttons[index]['text'] = player
+            # Forzar actualización inmediata de la GUI
+            winner = self.winner()
+            if winner:
+                self.update_score(winner)
+                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!")
+                self.reset_game()
+            elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
+                self.draws += 1
+                messagebox.showinfo("Juego Terminado", "¡Es un empate!")
+                self.reset_game()
+            else:
+                # Cambia el turno al jugador humano
+                self.turn = 'X'
+                self.update_scores()
+                # self.x
+
 
 if __name__ == "__main__":
     root = tk.Tk()
-    game = TicTacToe(root)
+    avl_tree = AVLTree()  # Asegúrate de que AVLTree esté correctamente definido
+    app = TicTacToeApp(root, avl_tree)
     root.mainloop()
