@@ -74,7 +74,8 @@ class TicTacToeApp:
         self.turn = 'X'  # Iniciar siempre con el jugador humano
         if not silent:
             # Reset the AVL tree only if it's a full reset, not during training
-            self.avl_tree.root = None
+            #self.avl_tree.root = None
+            print("tried to restart avl node")
         if hasattr(self, 'buttons'):
             for btn in self.buttons:
                 btn.config(text='')
@@ -146,7 +147,7 @@ class TicTacToeApp:
         
         # Update the Q value using the Q-learning formula
         updated_q = adjusted_reward + gamma * future_q
-        
+        print(updated_q)
         # Update the Q value for the given action
         node.value_q[action_index] = updated_q
 
@@ -256,25 +257,35 @@ class TicTacToeApp:
     def execute_move(self, index, player, pvpMode=True):
         if self.buttons[index]['text'] == '' and self.winner() is None:
             self.buttons[index]['text'] = player
-            # Forzar actualización inmediata de la GUI
+            self.root.update_idletasks()  # Forzar actualización inmediata de la GUI
+
+            # Evaluar el resultado del movimiento después de que se ha ejecutado
+            reward, is_diagonal, blocked_opponent = self.evaluate_move_result(index)
+
+            # Actualizar los valores Q con la nueva información
+            current_state = self.get_board_state()  # Obtener estado actual después del movimiento
+            self.update_q_values(current_state, index, reward, is_diagonal, blocked_opponent)
+
             winner = self.winner()
             if winner or all(btn['text'] != '' for btn in self.buttons):
-                # self.update_score(winner)
-                self.update_score(winner) if winner and pvpMode else None
-                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!") if pvpMode else None
-                self.save_screenshot() if pvpMode else None
+                if pvpMode:
+                    self.update_score(winner) if winner else None
+                    messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!") if winner else None
+                    self.save_screenshot() if winner else None
                 self.reset_game()
                 return  # Detener la ejecución si el juego ha terminado
             elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
-                self.draws += 1 if pvpMode else None
-                messagebox.showinfo("Juego Terminado", "¡Es un empate!")  if pvpMode else None
-                self.save_screenshot() if pvpMode else None
+                if pvpMode:
+                    self.draws += 1
+                    messagebox.showinfo("Juego Terminado", "¡Es un empate!")
+                    self.save_screenshot()
                 self.reset_game()
             else:
-                # Cambia el turno al jugador humano
-                if pvpMode is True:
+                # Cambia el turno al jugador humano si es PvP
+                if pvpMode:
                     self.turn = 'X'
-                    self.update_scores() 
+                    self.update_scores()
+
 
     def create_menu(self):
         menu_bar = Menu(self.root)
@@ -285,6 +296,8 @@ class TicTacToeApp:
         menu_bar.add_cascade(label="Juego", menu=file_menu)
         file_menu.add_command(label="Mostrar historial", command=self.show_history)
         file_menu.add_command(label="Entrenar modelo", command=self.ask_training_games)
+        file_menu.add_command(label="Generar diagrama de evolucion", command=self.show_avl_tree)
+
 
     def save_screenshot(self):
         # Ensure the 'history' directory exists
@@ -340,6 +353,7 @@ class TicTacToeApp:
 
 
     def train_model(self, N=100):
+        self.reset_game(False)
         training_window = Toplevel()
         training_window.title("Training in Progress")
         ttk.Label(training_window, text="Training... Please wait").pack(padx=10, pady=10)
@@ -355,7 +369,6 @@ class TicTacToeApp:
         def train():
             use_x = True
             best_q_value_before = self.get_best_q_value()  # Obtiene el mejor valor Q antes del entrenamiento
-            self.reset_game(False)
             for i in range(N):
                 self.root.after(500, self.simulate_game(use_x))                
                 use_x = not use_x
@@ -363,7 +376,7 @@ class TicTacToeApp:
             training_window.destroy()
 
             best_q_value_after = self.get_best_q_value()  # Obtiene el mejor valor Q después del entrenamiento
-            improvement = best_q_value_after
+            improvement = best_q_value_after - best_q_value_before
             messagebox.showinfo("Entrenamiento Completo", f"Entrenamiento completado. Mejora del valor Q: {improvement:.2f}")
 
         tk.Button(training_window, text="Cancel", command=training_window.destroy).pack(padx=10, pady=10)
@@ -396,17 +409,21 @@ class TicTacToeApp:
 
     def ask_training_games(self):
         try:
-            N = simpledialog.askinteger("Entrenamiento", "Ingresa el número de juegos para entrenar:", minvalue=1, maxvalue=20)
+            N = simpledialog.askinteger("Entrenamiento", "Ingresa el número de juegos para entrenar:", minvalue=1, maxvalue=100)
             if N is not None:
                 self.train_model(N)
         except ValueError:
             messagebox.showerror("Error", "Por favor, ingresa un número entero válido.")
 
     def get_best_q_value(self):
+        
         all_values = [node.value_q for node in self.avl_tree.get_all_nodes() if node.value_q]
         if not all_values:  # Comprobar si la lista está vacía
             return 0  # O el valor por defecto que consideres apropiado
         return max(max(values.values()) for values in all_values if values)
+    
+    def show_avl_tree(self):
+        self.avl_tree.visualize_tree()
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+from graphviz import Digraph
+
 class AVLNode:
     def __init__(self, board_state, value_q):
         self.board_state = board_state  # Tuple representation of the board
@@ -80,3 +82,28 @@ class AVLTree:
             self._inorder_traverse(node.left, nodes)
             nodes.append(node)
             self._inorder_traverse(node.right, nodes)
+
+    def visualize_tree(self, filename='avl_tree'):
+        dot = Digraph(comment='AVL Tree')
+        if not self.root:
+            dot.node('None', 'Empty Tree')
+            dot.render(filename, view=True)
+            return
+        self._add_nodes(dot, self.root)
+        self._add_edges(dot, self.root)
+        dot.render(filename, view=True)  # Guarda y muestra el gráfico automáticamente
+
+    def _add_nodes(self, dot, node):
+        if node:
+            # Simplificamos la etiqueta para mostrar solo el mejor valor Q
+            best_q_value = max(node.value_q.values()) if node.value_q else 'No Q-values'
+            label = f"Q: {best_q_value}"
+            dot.node(str(id(node)), label)
+            self._add_nodes(dot, node.left)
+            self._add_nodes(dot, node.right)
+
+    def _add_edges(self, dot, node):
+        if node and node.left:
+            dot.edge(str(id(node)), str(id(node.left)))
+        if node and node.right:
+            dot.edge(str(id(node)), str(id(node.right)))
