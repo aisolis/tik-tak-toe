@@ -69,3 +69,14 @@ class AVLTree:
             return self.search(node.left, board_state)
         else:
             return self.search(node.right, board_state)
+        
+    def get_all_nodes(self):
+        nodes = []
+        self._inorder_traverse(self.root, nodes)
+        return nodes
+
+    def _inorder_traverse(self, node, nodes):
+        if node is not None:
+            self._inorder_traverse(node.left, nodes)
+            nodes.append(node)
+            self._inorder_traverse(node.right, nodes)

@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, Toplevel, Menu, Label, PhotoImage
+from tkinter import messagebox, Toplevel, Menu, Label, Button, ttk, simpledialog
 from PIL import Image, ImageTk, ImageGrab
 from avlNode import AVLNode, AVLTree
 import numpy as np
@@ -27,11 +27,6 @@ class TicTacToeApp:
         
         self.reset_button = tk.Button(self.root, text='Reiniciar Juego', command=self.reset_game)
         self.reset_button.grid(row=3, column=0, columnspan=3)
-
-        # Botón para guardar la captura de pantalla del tablero
-        self.save_history_button = tk.Button(self.root, text='Guardar Historial', command=self.save_screenshot)
-        self.save_history_button.grid(row=3, column=1, columnspan=3)
-        
         self.update_scores()
 
     def update_scores(self):
@@ -63,16 +58,6 @@ class TicTacToeApp:
         elif winner == 'O':
             self.score_o += 1
 
-    def reset_game(self):
-        self.turn = 'X'
-        if hasattr(self, 'buttons'):
-            for btn in self.buttons:
-                btn.config(text='')
-        self.score_x = getattr(self, 'score_x', 0)
-        self.score_o = getattr(self, 'score_o', 0)
-        self.draws = getattr(self, 'draws', 0)
-        self.update_scores()
-
     def create_widgets(self):
         self.buttons = []
         for i in range(9):
@@ -85,18 +70,22 @@ class TicTacToeApp:
         self.reset_button.grid(row=3, column=0, columnspan=3)
         self.update_scores()
 
-    def reset_game(self):
+    def reset_game(self, silent=False):
         self.turn = 'X'  # Iniciar siempre con el jugador humano
-        self.avl_tree.root = None  # Reiniciar el árbol AVL
+        if not silent:
+            # Reset the AVL tree only if it's a full reset, not during training
+            self.avl_tree.root = None
         if hasattr(self, 'buttons'):
             for btn in self.buttons:
                 btn.config(text='')
-        self.score_x = getattr(self, 'score_x', 0)
-        self.score_o = getattr(self, 'score_o', 0)
-        self.draws = getattr(self, 'draws', 0)
-        self.update_scores()
+        if not silent:
+            self.score_x = getattr(self, 'score_x', 0)
+            self.score_o = getattr(self, 'score_o', 0)
+            self.draws = getattr(self, 'draws', 0)
+            self.update_scores()
 
-    def on_button_press(self, index):
+
+    def on_button_press(self, index, pvpMode=True):
         if self.buttons[index]['text'] == '' and self.winner() is None:
             self.buttons[index]['text'] = self.turn
             current_state = self.get_board_state()
@@ -110,19 +99,19 @@ class TicTacToeApp:
             # Verificar si hay un ganador
             winner = self.winner()
             if winner:
-                self.update_score(winner)
-                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!")
+                self.update_score(winner) if pvpMode else None
+                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!") if pvpMode else None
                 self.save_screenshot() 
                 self.reset_game()
             elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
-                self.draws += 1
-                messagebox.showinfo("Juego Terminado", "¡Es un empate!")
+                self.draws += 1 if pvpMode else None
+                messagebox.showinfo("Juego Terminado", "¡Es un empate!") if pvpMode else None
                 self.save_screenshot() 
                 self.reset_game()
             else:
                 # Cambiar el turno
                 self.turn = 'O' if self.turn == 'X' else 'X'
-                self.update_scores()
+                self.update_scores() if pvpMode else None
                 # Si es el turno de la máquina, realizar el movimiento
                 if self.turn == 'O':
                     self.root.after(500, self.machine_move)
@@ -181,7 +170,7 @@ class TicTacToeApp:
                     chosen_index = self.choose_best_move(current_state, empty_indices)
 
             # Ejecuta el movimiento seleccionado para la máquina
-            self.execute_move(chosen_index, 'O')
+            self.execute_move(chosen_index, 'O', False)
 
             # Evaluar el resultado del movimiento después de que se ha ejecutado
             reward, is_diagonal, blocked_opponent = self.evaluate_move_result(chosen_index)
@@ -264,26 +253,28 @@ class TicTacToeApp:
 
         return reward, is_diagonal, blocked_opponent
 
-    def execute_move(self, index, player):
+    def execute_move(self, index, player, pvpMode=True):
         if self.buttons[index]['text'] == '' and self.winner() is None:
             self.buttons[index]['text'] = player
             # Forzar actualización inmediata de la GUI
             winner = self.winner()
-            if winner:
-                self.update_score(winner)
-                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!")
-                self.save_screenshot() 
+            if winner or all(btn['text'] != '' for btn in self.buttons):
+                # self.update_score(winner)
+                self.update_score(winner) if winner and pvpMode else None
+                messagebox.showinfo("Juego Terminado", f"El ganador es {winner}!") if pvpMode else None
+                self.save_screenshot() if pvpMode else None
                 self.reset_game()
+                return  # Detener la ejecución si el juego ha terminado
             elif '' not in [btn['text'] for btn in self.buttons]:  # Comprobar si el tablero está lleno
-                self.draws += 1
-                messagebox.showinfo("Juego Terminado", "¡Es un empate!")
-                self.save_screenshot() 
+                self.draws += 1 if pvpMode else None
+                messagebox.showinfo("Juego Terminado", "¡Es un empate!")  if pvpMode else None
+                self.save_screenshot() if pvpMode else None
                 self.reset_game()
             else:
                 # Cambia el turno al jugador humano
-                self.turn = 'X'
-                self.update_scores()
-                # self.x
+                if pvpMode is True:
+                    self.turn = 'X'
+                    self.update_scores() 
 
     def create_menu(self):
         menu_bar = Menu(self.root)
@@ -291,8 +282,9 @@ class TicTacToeApp:
 
         # Adding a 'File' menu
         file_menu = Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="Archivo", menu=file_menu)
-        file_menu.add_command(label="Historial", command=self.show_history)
+        menu_bar.add_cascade(label="Juego", menu=file_menu)
+        file_menu.add_command(label="Mostrar historial", command=self.show_history)
+        file_menu.add_command(label="Entrenar modelo", command=self.ask_training_games)
 
     def save_screenshot(self):
         # Ensure the 'history' directory exists
@@ -345,6 +337,76 @@ class TicTacToeApp:
         # Pack and place the canvas and scrollbar in the window
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
+
+
+    def train_model(self, N=100):
+        training_window = Toplevel()
+        training_window.title("Training in Progress")
+        ttk.Label(training_window, text="Training... Please wait").pack(padx=10, pady=10)
+
+        progress = ttk.Progressbar(training_window, orient="horizontal", length=200, mode='determinate')
+        progress.pack(padx=10, pady=10)
+        training_window.pack_slaves()
+
+        def update_progress_bar(current, total):
+            progress['value'] = (current / total) * 100
+            self.root.update_idletasks()
+
+        def train():
+            use_x = True
+            best_q_value_before = self.get_best_q_value()  # Obtiene el mejor valor Q antes del entrenamiento
+            self.reset_game(False)
+            for i in range(N):
+                self.root.after(500, self.simulate_game(use_x))                
+                use_x = not use_x
+                update_progress_bar(i + 1, N)
+            training_window.destroy()
+
+            best_q_value_after = self.get_best_q_value()  # Obtiene el mejor valor Q después del entrenamiento
+            improvement = best_q_value_after
+            messagebox.showinfo("Entrenamiento Completo", f"Entrenamiento completado. Mejora del valor Q: {improvement:.2f}")
+
+        tk.Button(training_window, text="Cancel", command=training_window.destroy).pack(padx=10, pady=10)
+
+        self.root.after(100, train)
+
+    def simulate_game(self, use_x):
+        self.reset_game(silent=True)  # Asegurarse de no reiniciar el árbol AVL
+        self.turn = 'X' if use_x else 'O'
+        move_count = 0  # Contador para verificar cantidad de movimientos y prevenir bucle infinito
+
+        while move_count < 9:  # Hay un máximo de 9 movimientos en un tablero 3x3
+            current_state = self.get_board_state()
+            empty_indices = [i for i, btn in enumerate(self.buttons) if btn['text'] == '']
+            if not empty_indices:
+                break  # Salir si no hay casillas vacías
+
+            move_index = self.choose_best_move(current_state, empty_indices)
+            self.execute_move(move_index, self.turn, False)
+
+            winner = self.winner()
+            if winner or '' not in [btn['text'] for btn in self.buttons]:
+                break  # Salir si hay un ganador o no quedan movimientos
+
+            self.turn = 'O' if self.turn == 'X' else 'X'  # Alternar turno
+            move_count += 1
+
+        self.reset_game(silent=True)  # Reiniciar el juego de forma silenciosa para la siguiente simulación
+
+
+    def ask_training_games(self):
+        try:
+            N = simpledialog.askinteger("Entrenamiento", "Ingresa el número de juegos para entrenar:", minvalue=1, maxvalue=20)
+            if N is not None:
+                self.train_model(N)
+        except ValueError:
+            messagebox.showerror("Error", "Por favor, ingresa un número entero válido.")
+
+    def get_best_q_value(self):
+        all_values = [node.value_q for node in self.avl_tree.get_all_nodes() if node.value_q]
+        if not all_values:  # Comprobar si la lista está vacía
+            return 0  # O el valor por defecto que consideres apropiado
+        return max(max(values.values()) for values in all_values if values)
 
 
 if __name__ == "__main__":
