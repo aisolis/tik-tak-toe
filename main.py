@@ -89,13 +89,13 @@ class TicTacToeApp:
     def on_button_press(self, index, pvpMode=True):
         if self.buttons[index]['text'] == '' and self.winner() is None:
             self.buttons[index]['text'] = self.turn
-            current_state = self.get_board_state()
+            #current_state = self.get_board_state()
 
             # Actualizar el árbol AVL con el nuevo estado del juego
             # Nota: Deberías definir cómo calcular el valor Q para el nuevo estado aquí
             # Por simplicidad, se usa un valor Q dummy
-            dummy_value_q = {i: 0 for i in range(9) if self.buttons[i]['text'] == ''}
-            self.avl_tree.root = self.avl_tree.insert(self.avl_tree.root, current_state, dummy_value_q)
+            #dummy_value_q = {i: 0 for i in range(9) if self.buttons[i]['text'] == ''}
+            #self.avl_tree.root = self.avl_tree.insert(self.avl_tree.root, current_state, dummy_value_q)
 
             # Verificar si hay un ganador
             winner = self.winner()
@@ -115,7 +115,8 @@ class TicTacToeApp:
                 self.update_scores() if pvpMode else None
                 # Si es el turno de la máquina, realizar el movimiento
                 if self.turn == 'O':
-                    self.root.after(500, self.machine_move)
+                    self.avl_tree.remove_duplicates()
+                    self.root.after(500, self.machine_move(True))
 
     def get_board_state(self):
         # Convertir el estado del tablero a una tupla para ser hashable
@@ -152,7 +153,7 @@ class TicTacToeApp:
         node.value_q[action_index] = updated_q
 
 
-    def machine_move(self):
+    def machine_move(self, pvpMode=False):
         current_state = self.get_board_state()
         empty_indices = [i for i, btn in enumerate(self.buttons) if btn['text'] == '']
         print("machine turn")
@@ -171,7 +172,7 @@ class TicTacToeApp:
                     chosen_index = self.choose_best_move(current_state, empty_indices)
 
             # Ejecuta el movimiento seleccionado para la máquina
-            self.execute_move(chosen_index, 'O', False)
+            self.execute_move(chosen_index, 'O', pvpMode)
 
             # Evaluar el resultado del movimiento después de que se ha ejecutado
             reward, is_diagonal, blocked_opponent = self.evaluate_move_result(chosen_index)
