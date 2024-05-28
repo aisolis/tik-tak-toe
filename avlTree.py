@@ -166,4 +166,3 @@ class AVLTree:
 
         for board_state in duplicates:
             self.root = self.delete_node(self.root, board_state)
-        print("end cleaning nodes")

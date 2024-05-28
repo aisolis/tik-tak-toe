@@ -38,7 +38,7 @@ class BoardManager:
     def reset_game(self, silent=False):
         self.turn = 'X'  # Iniciar siempre con el jugador humano
         if not silent:
-            # Reset the AVL tree only if it's a full reset, not during training
+            # Reinicia el arbol AVL solo si es un reseteo forzado, mas no durante el training
             #self.avl_tree.root = None
             print("tried to restart avl node")
         if hasattr(self, 'buttons'):
@@ -82,7 +82,6 @@ class BoardManager:
         menu_bar = Menu(self.root)
         self.root.config(menu=menu_bar)
 
-        # Adding a 'File' menu
         file_menu = Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Juego", menu=file_menu)
         file_menu.add_command(label="Mostrar historial", command=self.show_history)
@@ -92,16 +91,16 @@ class BoardManager:
         self.init_Ia(self)
 
     def show_history(self):
-        # Open a new window to show the history of games
+        # Abre una ventana nueva con el hsitorial de partidas
         history_window = Toplevel()
         history_window.title("Historial de Partidas")
 
-        # Use a scrollbar on the canvas
+        # agrega el scroll al canvas
         canvas = tk.Canvas(history_window)
         scrollbar = tk.Scrollbar(history_window, command=canvas.yview)
         scrollable_frame = tk.Frame(canvas)
 
-        # Configure canvas and scrollbar
+        # Configura el canvas y scrollbar
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
@@ -117,13 +116,11 @@ class BoardManager:
             label_image.image = photo  # Keep a reference!
             label_image.grid(row=i, column=0, padx=10, pady=10)
 
-            # Display dummy Q-values or load real Q-values if you have them
-            # Example with dummy values:
+            # Dado que no tenemos forma de guardar los q values, generamos dummys q values
             q_values_text = "Q-values: " + ", ".join(f"{k}: {v:.2f}" for k, v in enumerate(np.random.rand(9)))
             label_q_values = Label(scrollable_frame, text=f"Partida {i}: {q_values_text}", font=("Arial", 10))
             label_q_values.grid(row=i, column=1, sticky="w", padx=10)
 
-        # Pack and place the canvas and scrollbar in the window
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
 
@@ -143,14 +140,7 @@ class BoardManager:
     def on_button_press(self, index, pvpMode=True):
         if self.buttons[index]['text'] == '' and self.winner() is None:
             self.buttons[index]['text'] = self.turn
-            #current_state = self.get_board_state()
-
-            # Actualizar el árbol AVL con el nuevo estado del juego
-            # Nota: Deberías definir cómo calcular el valor Q para el nuevo estado aquí
-            # Por simplicidad, se usa un valor Q dummy
-            #dummy_value_q = {i: 0 for i in range(9) if self.buttons[i]['text'] == ''}
-            #self.avl_tree.root = self.avl_tree.insert(self.avl_tree.root, current_state, dummy_value_q)
-
+            
             # Verificar si hay un ganador
             winner = self.winner()
             if winner:

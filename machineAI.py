@@ -13,40 +13,6 @@ class MachineIa:
         self.avl_tree = boardContext.avl_tree
         self.gameUtilities = GameUtilities(boardContext)
 
-    # def machine_move(self, pvpMode=False):
-    #     current_state = self.boardContext.get_board_state()
-    #     empty_indices = [i for i, btn in enumerate(self.boardContext.buttons) if btn['text'] == '']
-    #     print("machine turn")
-    #     if empty_indices:
-    #         # Decidir entre explorar o explotar
-    #         epsilon = 0.1  # Probabilidad de exploración
-    #         if np.random.random() < epsilon:
-    #             chosen_index = random.choice(empty_indices)  # Exploración: movimiento aleatorio
-    #             print("machine exploration")
-    #         else:
-    #             # Verifica si necesita bloquear una jugada ganadora del humano
-    #             chosen_index = self.block_opponent_win(current_state, empty_indices)
-    #             if chosen_index is None:
-    #                 # Si no hay jugada de bloqueo necesaria, explotar basado en Q-values
-    #                 print("machine explore")
-    #                 chosen_index = self.choose_best_move(current_state, empty_indices)
-
-    #         # Ejecuta el movimiento seleccionado para la máquina
-    #         self.execute_move(chosen_index, 'O', pvpMode)
-
-    #         # Evaluar el resultado del movimiento después de que se ha ejecutado
-    #         reward, is_diagonal, blocked_opponent = self.evaluate_move_result(chosen_index)
-
-    #         # Actualizar los valores Q con la nueva información
-    #         self.update_q_values(current_state, chosen_index, reward, is_diagonal, blocked_opponent)
-    #         print("imprimiendo q values")
-    #         # Verificar el estado del juego y cambiar el turno si es necesario
-    #         if not self.boardContext.winner() and '' in [btn['text'] for btn in self.boardContext.buttons]:
-    #             self.boardContext.turn = 'X'  # Devolver el turno al jugador humano
-    #             self.boardContext.update_scores()
-    #             print("devolviendo turno")
-    #         print("fin")
-
     def machine_move(self, pvpMode=False):
         print("machine turn")
         empty_indices = [i for i, btn in enumerate(self.boardContext.buttons) if btn['text'] == '']
@@ -102,48 +68,35 @@ class MachineIa:
                     self.boardContext.update_scores()
 
     def update_q_values(self, state, action_index, reward, is_diagonal_move=False, blocked_opponent=False, gamma=0.9):
-        # Search for the node with the current state in the AVL tree
+        # Busca el nodo con el estado actual del tablero
         node = self.avl_tree.search(self.avl_tree.root, state)
         
-        # If the node doesn't exist, create a new node with initial Q values
+        # Si no existe un nodo, entonces crea uno nuevo y lo inicializa con valores Q
         if not node:
             new_q_values = {i: 0 for i in range(9) if self.boardContext.buttons[i]['text'] == ''}
             node = AVLNode(state, new_q_values)
             self.avl_tree.root = self.avl_tree.insert(self.avl_tree.root, state, new_q_values)
-            node.value_q[action_index] = reward  # Initialize with given reward
+            node.value_q[action_index] = reward  # Se brinda una recompensa inicial
             
-        # Calculate the reward adjusted for special moves
+        # Calcula la recompensa, premiando si son movimientos dificiles de bloquear
         adjusted_reward = reward
         if is_diagonal_move:
             adjusted_reward += 0.5
         if blocked_opponent:
             adjusted_reward += 0.3
         
-        # Calculate the best future Q value from this state
+        # Calcula el mejor valor Q futuro para este estado
         if node.value_q:
             future_q = max(node.value_q.values())
         else:
             future_q = 0
         
-        # Update the Q value using the Q-learning formula
+        # Actualiza el valor q, usando la formula de recompensas para valores Q
         updated_q = adjusted_reward + gamma * future_q
         print(updated_q)
-        # Update the Q value for the given action
+        # Actualiza el valor del nodo en base al valor q actualizado
         node.value_q[action_index] = updated_q
 
-
-    
-
-    # def block_opponent_win(self, state, empty_indices):
-    #     opponent = 'X' if self.boardContext.turn == 'O' else 'O'
-    #     for index in empty_indices:
-    #         self.boardContext.buttons[index]['text'] = opponent  # Simula el movimiento del oponente
-    #         if self.boardContext.winner() == opponent:
-    #             print("machine detect a losse probably")
-    #             self.boardContext.buttons[index]['text'] = ''  # Limpia la simulación
-    #             return index  # Devuelve este índice para bloquear la jugada ganadora
-    #         self.boardContext.buttons[index]['text'] = ''  # Limpia la simulación
-    #     return None
 
     def block_opponent_win(self, empty_indices, current_state):
         current_player = self.boardContext.turn
